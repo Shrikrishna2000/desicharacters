@@ -136,7 +136,38 @@ async def websocket_endpoint(websocket: WebSocket, character_id: str):
     try:
         while True:
             data = await websocket.receive_text()
-            print(f"User message: {data}")
+            print(f"Received raw: {data}")
+
+            # Try to parse JSON safely
+            try:
+                parsed = json.loads(data)
+            except json.JSONDecodeError:
+                parsed = {"type": "message", "content": data}
+            
+            # Handle "resume" messages
+            if parsed.get("type") == "resume":
+                history = parsed.get("history", [])
+                print(f"Resuming conversation for {character_id} with {len(history)} messages")
+
+                # Optional: rebuild session state
+                session = conversation_sessions.get(character_id, [])
+                for msg in history:
+                    if msg["role"] == "user":
+                        session.append(HumanMessage(content=msg["parts"]))
+                    elif msg["role"] == "assistant":
+                        session.append(AIMessage(content=msg["parts"]))
+                    elif msg["role"] == "system":
+                        session.append(SystemMessage(content=msg["parts"]))
+
+                conversation_sessions[character_id] = session
+
+                await websocket.send_text(
+                    json.dumps({
+                        "role": "system",
+                        "parts": f"✅ Conversation for {character_id} restored ({len(history)} messages)."
+                    })
+                )
+                continue
 
             # Retrieve chat history
             chat_history = conversation_sessions[character_id]

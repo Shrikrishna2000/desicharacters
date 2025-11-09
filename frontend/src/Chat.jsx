@@ -78,7 +78,12 @@ function Chat() {
 
     ws.current = new WebSocket(`${BASE_URL}/ws/${characterId}`);
 
-    ws.current.onopen = () => setStatus("Connected");
+    ws.current.onopen = () => {
+      setStatus("Connected");
+      const history = getMessages(characterId);
+      ws.current.send(JSON.stringify({ type: "resume", history }));
+    };
+
 
     ws.current.onmessage = (event) => {
       let parsed;
